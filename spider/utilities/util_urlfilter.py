@@ -5,8 +5,8 @@ util_urlfilter.py by xianhu
 """
 
 import re
-import pybloom_live
-from .util_config import CONFIG_URLPATTERN_ALL
+from pybloom_live import ScalableBloomFilter
+from .util_config import CONFIG_URL_LEGAL_PATTERN, CONFIG_URL_ILLEGAL_PATTERN
 
 
 class UrlFilter(object):
@@ -14,45 +14,46 @@ class UrlFilter(object):
     class of UrlFilter, to filter url by regexs and (bloomfilter or set)
     """
 
-    def __init__(self, black_patterns=(CONFIG_URLPATTERN_ALL,), white_patterns=("^http",), capacity=None):
+    def __init__(self, black_patterns=(CONFIG_URL_ILLEGAL_PATTERN,), white_patterns=(CONFIG_URL_LEGAL_PATTERN,), capacity=None):
         """
-        constructor, use variable of BloomFilter if capacity else variable of set
+        constructor, use the instance of BloomFilter if capacity else the instance of set
         """
-        self.re_black_list = [re.compile(_pattern, flags=re.IGNORECASE) for _pattern in black_patterns]
-        self.re_white_list = [re.compile(_pattern, flags=re.IGNORECASE) for _pattern in white_patterns]
-
-        self.url_set = set() if not capacity else None
-        self.bloom_filter = pybloom_live.ScalableBloomFilter(capacity, error_rate=0.001) if capacity else None
+        self._re_black_list = [re.compile(pattern, flags=re.IGNORECASE) for pattern in black_patterns] if black_patterns else []
+        self._re_white_list = [re.compile(pattern, flags=re.IGNORECASE) for pattern in white_patterns] if white_patterns else []
+        self._urlfilter = set() if not capacity else ScalableBloomFilter(capacity, error_rate=0.001)
         return
 
-    def update(self):
+    def update(self, url_list):
         """
-        update this urlfilter, you can rewrite this function if necessary
+        update this urlfilter using a url_list
         """
-        raise NotImplementedError
+        for url in url_list:
+            self._urlfilter.add(url)
+        return
 
     def check(self, url):
         """
-        check the url to make sure that the url hasn't been fetched
+        check the url based on self._re_black_list and self._re_white_list
         """
-        # regex filter: black pattern, if match one return False
-        for re_black in self.re_black_list:
+        for re_black in self._re_black_list:
             if re_black.search(url):
                 return False
 
-        # regex filter: while pattern, if miss all return False
-        result = False
-        for re_white in self.re_white_list:
+        for re_white in self._re_white_list:
             if re_white.search(url):
-                if self.url_set is not None:
-                    result = False if url in self.url_set else True
-                    self.url_set.add(url)
-                elif self.bloom_filter is not None:
-                    # bloom filter, "add": if key already exists, return True, else return False
-                    result = (not self.bloom_filter.add(url))
-                else:
-                    pass
-                break
+                return True
 
-        # return result
+        return False if self._re_white_list else True
+
+    def check_and_add(self, url):
+        """
+        check the url to make sure it hasn't been fetched, and add url to this urlfilter
+        """
+        result = False
+        if self.check(url):
+            if isinstance(self._urlfilter, set):
+                result = (url not in self._urlfilter)
+                self._urlfilter.add(url)
+            else:
+                result = (not self._urlfilter.add(url))
         return result

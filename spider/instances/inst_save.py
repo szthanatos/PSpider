@@ -5,48 +5,36 @@ inst_save.py by xianhu
 """
 
 import sys
-import logging
-from ..utilities import params_chack, return_check
 
 
 class Saver(object):
     """
-    class of Saver, must include function working() and item_save()
+    class of Saver, must include function working()
     """
 
-    def __init__(self, file_name=None):
+    def __init__(self, save_pipe=sys.stdout):
         """
         constructor
+        :param save_pipe: default sys.stdout, also can be a file handler
         """
-        self.file_name = file_name      # default: None, output file or sys.stdout(if file_name is None)
-        self.save_pipe = open(file_name, "w", encoding="utf-8") if file_name else sys.stdout
+        self._save_pipe = save_pipe
         return
 
-    @params_chack(object, str, object, object)
-    def working(self, url, keys, item):
+    def working(self, url: str, keys: dict, item: (list, tuple)) -> (int, object):
         """
-        working function, must "try, except" and call self.item_save(), don't change parameters and return
-        :param url: the url, whose item needs to be saved
-        :param keys: some information of this url, which can be used in this function
-        :param item: the item of this url, which needs to be saved
-        :return result: True or False
+        working function, must "try, except" and don't change the parameters and returns
+        :return save_state: can be -1(save failed), 1(save success)
+        :return save_result: can be any object, or exception information[class_name, excep]
         """
-        logging.debug("Saver start: keys=%s, url=%s", keys, url)
-
         try:
-            result = self.item_save(url, keys, item)
+            save_state, save_result = self.item_save(url, keys, item)
         except Exception as excep:
-            result = False
-            logging.error("Saver error: %s, keys=%s, url=%s", excep, keys, url)
+            save_state, save_result = -1, [self.__class__.__name__, str(excep)]
 
-        logging.debug("Saver end: result=%s, url=%s", result, url)
-        return result
+        return save_state, save_result
 
-    @return_check(bool)
-    def item_save(self, url, keys, item):
+    def item_save(self, url: str, keys: dict, item: (list, tuple)) -> (int, object):
         """
-        save the item of a url, you can rewrite this function, parameters and return refer to self.working()
+        save the item of a url, you must overwrite this function, parameters and returns refer to self.working()
         """
-        self.save_pipe.write("\t".join([url, str(keys), "\t".join([str(i) for i in item])]) + "\n")
-        self.save_pipe.flush()
-        return True
+        raise NotImplementedError

@@ -1,9 +1,11 @@
 # _*_ coding: utf-8 _*_
 
 """
-define WebSpider, and define utilities and instances for web_spider
+define WebSpider, and also define utilities and instances for web_spider
 """
 
+__version__ = "2.2.0"
+
 from .utilities import *
-from .instances import *
-from .concurrent import WebSpider
+from .concurrent import TPEnum, WebSpider
+from .instances import Fetcher, Parser, Saver, Proxieser

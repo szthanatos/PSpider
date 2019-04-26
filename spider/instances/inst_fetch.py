@@ -6,68 +6,41 @@ inst_fetch.py by xianhu
 
 import time
 import random
-import logging
-import requests
-from ..utilities import make_random_useragent, params_chack, return_check
 
 
 class Fetcher(object):
     """
-    class of Fetcher, must include function working() and url_fetch()
+    class of Fetcher, must include function working()
     """
 
-    def __init__(self, normal_max_repeat=3, normal_sleep_time=3, critical_max_repeat=10, critical_sleep_time=10):
+    def __init__(self, sleep_time=0, max_repeat=3):
         """
         constructor
+        :param sleep_time: default 0, sleeping time after a fetching
+        :param max_repeat: default 3, maximum repeat count of a fetching
         """
-        self.normal_max_repeat = normal_max_repeat          # default: 3, maximum repeat time for normal url
-        self.normal_sleep_time = normal_sleep_time          # default: 3, sleeping time after a fetching for normal url
-        self.critical_max_repeat = critical_max_repeat      # default: 10, maximum repeat time for critical url
-        self.critical_sleep_time = critical_sleep_time      # default: 10, sleeping time after a fetching for critical url
+        self._sleep_time = sleep_time
+        self._max_repeat = max_repeat
         return
 
-    @params_chack(object, str, object, bool, int)
-    def working(self, url, keys, critical, fetch_repeat):
+    def working(self, priority: int, url: str, keys: dict, deep: int, repeat: int, proxies=None) -> (int, object, int):
         """
-        working function, must "try, expect" and call self.url_fetch(), don't change parameters and return
-        :param url: the url, which needs to be fetched
-        :param keys: some information of this url, which can be used in this function
-        :param critical: the critical flag of this url, which can be used in this function
-        :param fetch_repeat: the fetch repeat time of this url, if fetch_repeat >= self.*_max_repeat, return code = -1
-        :return (code, content): code can be -1(fetch failed), 0(need repeat), 1(fetch success), content must be a list or tuple
+        working function, must "try, except" and don't change the parameters and returns
+        :return fetch_state: can be -1(fetch failed), 0(need repeat), 1(fetch success)
+        :return fetch_result: can be any object, or exception information[class_name, excep]
+        :return proxies_state: can be -1(unavaiable), 0(return to queue), 1(avaiable)
         """
-        logging.debug("Fetcher start: keys=%s, critical=%s, fetch_repeat=%s, url=%s", keys, critical, fetch_repeat, url)
+        time.sleep(random.randint(0, self._sleep_time))
 
-        time.sleep(random.randint(0, self.normal_sleep_time if (not critical) else self.critical_sleep_time))
         try:
-            code, content = self.url_fetch(url, keys, critical, fetch_repeat)
+            fetch_state, fetch_result, proxies_state = self.url_fetch(priority, url, keys, deep, repeat, proxies=proxies)
         except Exception as excep:
-            if ((not critical) and (fetch_repeat >= self.normal_max_repeat)) or (critical and (fetch_repeat >= self.critical_max_repeat)):
-                code, content = -1, None
-                logging.error("Fetcher error: %s, keys=%s, critical=%s, fetch_repeat=%s, url=%s", excep, keys, critical, fetch_repeat, url)
-            else:
-                code, content = 0, None
-                logging.debug("Fetcher repeat: %s, keys=%s, critical=%s, fetch_repeat=%s, url=%s", excep, keys, critical, fetch_repeat, url)
+            fetch_state, fetch_result, proxies_state = (-1 if repeat >= self._max_repeat else 0), [self.__class__.__name__, str(excep)], -1
 
-        logging.debug("Fetcher end: code=%s, url=%s", code, url)
-        return code, content
+        return fetch_state, fetch_result, proxies_state
 
-    @return_check(int, (tuple, list))
-    def url_fetch(self, url, keys, critical, fetch_repeat):
+    def url_fetch(self, priority: int, url: str, keys: dict, deep: int, repeat: int, proxies=None) -> (int, object, int):
         """
-        fetch the content of a url, you can rewrite this function, parameters and return refer to self.working()
+        fetch the content of a url, you must overwrite this function, parameters and returns refer to self.working()
         """
-        # get response based on headers
-        headers = {
-            "User-Agent": make_random_useragent(),
-            "Accept-Encoding": "gzip",
-        }
-        response = requests.get(url, params=None, data=None, headers=headers, cookies=None, timeout=(3.05, 10))
-        if response.history:
-            logging.debug("Fetcher redirect: keys=%s, critical=%s, fetch_repeat=%s, url=%s", keys, critical, fetch_repeat, url)
-
-        # get content(cur_code, cur_url, cur_html)
-        content = (response.status_code, response.url, response.text)
-
-        # return code, conten
-        return 1, content
+        raise NotImplementedError

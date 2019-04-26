@@ -1,7 +1,8 @@
 # _*_ coding: utf-8 _*_
 
 """
-define ConcurPool as WebSpider
+define ThreadPool as WebSpider
 """
 
-from .concur_pool import ConcurPool as WebSpider
+from .threads_inst import TPEnum
+from .threads_pool import ThreadPool as WebSpider
